@@ -1,16 +1,15 @@
 #include <ros/ros.h>
-#include "geometry_msgs/Twist.h"
-#include "turtlesim/Pose.h"
+#include <tf/tf.h>
+#include <move_base_msgs/MoveBaseAction.h>
+#include <actionlib/client/simple_action_client.h>
+#include <tf/transform_listener.h>
+#include <actionlib/server/simple_action_server.h>
+#include "geometry_msgs/PoseWithCovarianceStamped.h"
+#include "geometry_msgs/PointStamped.h" 
 ros::Publisher velocity_publisher; 
 ros::Subscriber pose_subscriber;
 turtlesim::Pose turtlesim_pose;
 
-const double x_min = 0.0;
-const double y_min = 0.0;
-const double x_max = 11.0;
-const double y_max = 11.0;
-
-const double PI = 3.1415926;
 
 //method to move the robot straight forward
 
@@ -19,12 +18,7 @@ void move(double speed, double distance, bool isForward);
 int main (int argc, char **argv){
     ros::init(argc, argv, "turtle_move_forward");
     ros::NodeHandle n;
-    double speed = 2;
-    double angular_speed;
-    double distance = 2;
-    double angle;
-    bool isForward = true;
-    bool clockwise;
+    
 
     velocity_publisher = n.advertise<geometry_msgs::Twist>("/turtle1/cmd_vel", 10);
 
@@ -32,48 +26,28 @@ int main (int argc, char **argv){
 
     ROS_INFO("\n\n\n******STARTING******\n");
     
-    move(speed, distance, isForward);
+    move_turtlebot(2.0, 2.0, 0.0);
 
     ros::spin();
 
     return 0;
 }
 
-void move (double speed, double distance, bool isForward){
-    geometry_msgs::Twist vel_msg;
+void move_turtlebot(double x, double y, double yaw)
+{
+	actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> ac("move_base", true);
 
-    if (isForward){
-        vel_msg.linear.x = abs(speed);
-    }
+                ac.waitForServer();
+                move_base_msgs::MoveBaseGoal goal;
 
-    else {
-        vel_msg.linear.x = -abs(speed);
-    }
+                goal.target_pose.header.stamp = ros::Time::now();
+            	goal.target_pose.header.frame_id = "/map";
 
-    vel_msg.linear.y = 0;
-    vel_msg.linear.z = 0;
-    vel_msg.angular.x = 0;
-    vel_msg.angular.y = 0;
-    vel_msg.angular.z = 0;
-
-
-double t0 = ros::Time::now().toSec();
-double current_distance = 0.0;
-ros::Rate loop_rate(100);
-
-do{
-    velocity_publisher.publish(vel_msg);
-    double t1 = ros::Time::now().toSec();
-    current_distance = speed * (t1-t0);
-    ros::spinOnce();
-    loop_rate.sleep();
-}
-
-    
-
-    while(current_distance<distance);
-    vel_msg.linear.x = 0;
-    velocity_publisher.publish(vel_msg);
-
+		goal.target_pose.pose.position.x = x;
+		goal.target_pose.pose.position.y = y;
+		goal.target_pose.pose.position.z = 0.0;  
+		goal.target_pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
+		ac.sendGoal(goal);
+		ac.waitForResult(); 
 
 }
